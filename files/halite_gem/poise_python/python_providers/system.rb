@@ -57,22 +57,9 @@ module PoisePython
 
       def install_python
         install_system_packages
-        if node.platform_family?('debian') && system_package_name == 'python3.6'
-          # Ubuntu 18.04 and Debian 10 have some weird dependency fuckery going on.
-          _options = options
-          package %w{python3.6-venv python3.6-distutils} do
-            action(:upgrade) if _options['package_upgrade']
-          end
-        end
       end
 
       def uninstall_python
-        if node.platform_family?('debian') && system_package_name == 'python3.6'
-          # Other side of the depdency nonsense.
-          package %w{python3.6-venv python3.6-distutils} do
-            action(:purge)
-          end
-        end
         uninstall_system_packages
       end
 
