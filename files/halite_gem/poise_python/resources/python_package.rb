@@ -45,29 +45,29 @@ if re.match(r'0\\.|1\\.|6\\.0', pip.__version__):
 
 try:
   from pip.commands import InstallCommand
-except (ImportError, ModuleNotFoundError):
+except Exception:
   # Pip 10 moved all internals to their own package.
   try:
     from pip._internal.commands import InstallCommand
-  except (ImportError, ModuleNotFoundError):
+  except Exception:
     from pip._internal.commands.install import InstallCommand
 
 try:
   from pip.index import PackageFinder
-except (ImportError, ModuleNotFoundError):
+except Exception:
   try:
     from pip._internal.index import PackageFinder
-  except (ImportError, ModuleNotFoundError):
+  except Exception:
     from pip._internal.index.package_finder import PackageFinder
 
 try:
   from pip.req import InstallRequirement
   install_req_from_line = InstallRequirement.from_line
-except (ImportError, ModuleNotFoundError):
+except Exception:
   try:
     from pip._internal.req import InstallRequirement
     install_req_from_line = InstallRequirement.from_line
-  except (ImportError, ModuleNotFoundError):
+  except Exception:
     # Pip 18.1 moved from_line to the constructors
     from pip._internal.req.constructors import install_req_from_line
 
