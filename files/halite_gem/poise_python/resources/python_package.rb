@@ -1,3 +1,4 @@
+# coding: utf-8
 #
 # Copyright 2015-2017, Noah Kantrowitz
 #
@@ -37,30 +38,38 @@ import re
 import sys
 
 import pip
-
 # Don't use pkg_resources because I don't want to require it before this anyway.
 if re.match(r'0\\.|1\\.|6\\.0', pip.__version__):
   sys.stderr.write('The python_package resource requires pip >= 6.1.0, currently '+pip.__version__+'\\n')
   sys.exit(1)
-tempstore =  pip.__version__.split('.')
-if len(tempstore) > 1:
-  current_version_pip_int = float(tempstore[0]+"."+tempstore[1])
-else:
-  current_version_pip_int = float(tempstore[0])
+
 try:
   from pip.commands import InstallCommand
-  from pip.index import PackageFinder
-  from pip.req import InstallRequirement
 except ImportError:
   # Pip 10 moved all internals to their own package.
-  from pip._internal.commands import InstallCommand
-  from pip._internal.index import PackageFinder
-  if current_version_pip_int <= 18.1:
+  try:
+    from pip._internal.commands import InstallCommand
+  except ImportError:
+    from pip._internal.commands.install import InstallCommand
+
+try:
+  from pip.index import PackageFinder
+except ImportError:
+  try:
+    from pip._internal.index import PackageFinder
+  except ImportError:
+    from pip._internal.index.package_finder import PackageFinder
+
+try:
+  from pip.req import InstallRequirement
+  install_req_from_line = InstallRequirement.from_line
+except ImportError:
+  try:
     from pip._internal.req import InstallRequirement
-  else:
-    from pip._internal.req.constructors import (
-      install_req_from_editable, install_req_from_line,
-    )
+    install_req_from_line = InstallRequirement.from_line
+  except ImportError:
+    # Pip 18.1 moved from_line to the constructors
+    from pip._internal.req.constructors import install_req_from_line
 
 packages = {}
 cmd = InstallCommand()
@@ -84,10 +93,7 @@ with cmd._build_session(options) as session:
   finder = PackageFinder(**finder_options)
   find_all = getattr(finder, 'find_all_candidates', getattr(finder, '_find_all_versions', None))
   for arg in args:
-    if current_version_pip_int <= 18.1:
-      req = InstallRequirement.from_line(arg)
-    else:
-      req = install_req_from_line(arg)
+    req = install_req_from_line(arg)
     found = finder.find_requirement(req, True)
     all_candidates = find_all(req.name)
     candidate = [c for c in all_candidates if c.location == found]
@@ -364,7 +370,6 @@ EOH
         # @param requirements [Array<String>] Pip-formatted package requirements.
         # @return [Mixlib::ShellOut]
         def pip_outdated(requirements)
-          puts "checking for #{requirements.to_s}"
           pip_command(nil, :list, requirements, input: PIP_HACK_SCRIPT, pip_runner: %w{-})
         end
 

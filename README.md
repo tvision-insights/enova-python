@@ -127,6 +127,9 @@ python_runtime '2'
   *(default: true)*
 * `wheel_version` – Version of wheel to install. If set to `true`, use the
   latest. If set to `false`, do not install wheel.
+* `environment` - Hash of a additional environment variables  <
+  This is a good place to set pip variables, like `PIP_INDEX_ <
+  `PIP_EXTRA_INDEX_URL`.
 
 #### Provider Options
 
