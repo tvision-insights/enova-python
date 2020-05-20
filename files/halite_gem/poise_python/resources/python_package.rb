@@ -43,6 +43,8 @@ if re.match(r'0\\.|1\\.|6\\.0', pip.__version__):
   sys.stderr.write('The python_package resource requires pip >= 6.1.0, currently '+pip.__version__+'\\n')
   sys.exit(1)
 
+cmd = None
+
 try:
   from pip.commands import InstallCommand
 except Exception:
@@ -50,7 +52,8 @@ except Exception:
   try:
     from pip._internal.commands import InstallCommand
   except Exception:
-    from pip._internal.commands.install import InstallCommand
+    from pip._internal.commands import create_command
+    cmd = create_command("install")
 
 try:
   from pip.index import PackageFinder
@@ -72,7 +75,9 @@ except Exception:
     from pip._internal.req.constructors import install_req_from_line
 
 packages = {}
-cmd = InstallCommand()
+
+if cmd is None:
+  cmd = InstallCommand()
 options, args = cmd.parse_args(sys.argv[1:])
 with cmd._build_session(options) as session:
   if options.no_index:
