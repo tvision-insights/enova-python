@@ -61,9 +61,10 @@ except Exception:
   try:
     from pip._internal.index import PackageFinder
   except Exception:
+    from pip._internal.index.collector import LinkCollector
     from pip._internal.index.package_finder import PackageFinder
+    from pip._internal.models.search_scope import SearchScope
     from pip._internal.models.selection_prefs import SelectionPreferences
-    from pip._internal.self_outdated_check import make_link_collector
 
 try:
   from pip.req import InstallRequirement
@@ -87,7 +88,7 @@ with cmd._build_session(options) as session:
   else:
     index_urls = [options.index_url] + options.extra_index_urls
   finder_options = dict(
-    find_links=options.find_links,
+    find_links=options.find_links or [],
     index_urls=index_urls,
     allow_all_prereleases=options.pre,
     trusted_hosts=options.trusted_hosts,
@@ -101,7 +102,12 @@ with cmd._build_session(options) as session:
     finder = PackageFinder(**finder_options)
   except TypeError:
     finder = PackageFinder.create(
-      make_link_collector(session, options=finder_options),
+      LinkCollector(session=session,
+                    search_scope=SearchScope.create(
+                      find_links=finder_options['find_links'],
+                      index_urls=finder_options['index_urls']
+                    )
+      ),
       SelectionPreferences(allow_all_prereleases=finder_options['allow_all_prereleases'],
                            format_control=finder_options.get('format_control')
       )
