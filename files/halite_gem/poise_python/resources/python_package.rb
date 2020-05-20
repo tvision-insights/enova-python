@@ -62,6 +62,8 @@ except Exception:
     from pip._internal.index import PackageFinder
   except Exception:
     from pip._internal.index.package_finder import PackageFinder
+    from pip._internal.models.selection_prefs import SelectionPreferences
+    from pip._internal.self_outdated_check import make_link_collector
 
 try:
   from pip.req import InstallRequirement
@@ -95,7 +97,15 @@ with cmd._build_session(options) as session:
     finder_options['process_dependency_links'] = options.process_dependency_links
   if getattr(options, 'format_control', None):
     finder_options['format_control'] = options.format_control
-  finder = PackageFinder(**finder_options)
+  try:
+    finder = PackageFinder(**finder_options)
+  except TypeError:
+    finder = PackageFinder.create(
+      make_link_collector(session, options=finder_options),
+      SelectionPreferences(allow_all_prereleases=finder_options['allow_all_prereleases'],
+                           format_control=finder_options.get('format_control')
+      )
+    )
   find_all = getattr(finder, 'find_all_candidates', getattr(finder, '_find_all_versions', None))
   for arg in args:
     req = install_req_from_line(arg)
