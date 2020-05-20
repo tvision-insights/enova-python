@@ -16,5 +16,5 @@
 
 
 module PoisePython
-  VERSION = '1.8.10'
+  VERSION = '1.8.11'
 end
