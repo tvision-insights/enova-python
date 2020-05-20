@@ -108,7 +108,8 @@ with cmd._build_session(options) as session:
                       index_urls=finder_options['index_urls']
                     )
       ),
-      SelectionPreferences(allow_all_prereleases=finder_options['allow_all_prereleases'],
+      SelectionPreferences(allow_yanked=False,
+                           allow_all_prereleases=finder_options['allow_all_prereleases'],
                            format_control=finder_options.get('format_control')
       )
     )
