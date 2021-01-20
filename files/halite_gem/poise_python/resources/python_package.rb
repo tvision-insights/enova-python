@@ -36,21 +36,19 @@ module PoisePython
 import json
 import re
 import sys
-
 import pip
-# Don't use pkg_resources because I don't want to require it before this anyway.
+
 if re.match(r'0\\.|1\\.|6\\.0', pip.__version__):
   sys.stderr.write('The python_package resource requires pip >= 6.1.0, currently '+pip.__version__+'\\n')
   sys.exit(1)
 
-cmd = None
-
 try:
   from pip.commands import InstallCommand
+  cmd = InstallCommand()
 except Exception:
-  # Pip 10 moved all internals to their own package.
   try:
     from pip._internal.commands import InstallCommand
+    cmd = InstallCommand()
   except Exception:
     from pip._internal.commands import create_command
     cmd = create_command("install")
@@ -61,10 +59,29 @@ except Exception:
   try:
     from pip._internal.index import PackageFinder
   except Exception:
-    from pip._internal.index.collector import LinkCollector
     from pip._internal.index.package_finder import PackageFinder
-    from pip._internal.models.search_scope import SearchScope
-    from pip._internal.models.selection_prefs import SelectionPreferences
+
+try:
+  from pip._internal.index.collector import LinkCollector
+  USE_LINK_COLLECTOR=True
+except Exception:
+  try:
+    from pip._internal.collector import LinkCollector
+    USE_LINK_COLLECTOR=True
+  except Exception:
+    USE_LINK_COLLECTOR=False
+
+try:
+  from pip._internal.models.search_scope import SearchScope
+  USE_SEARCH_SCOPE=True
+except Exception:
+  USE_SEARCH_SCOPE=False
+
+try:
+  from pip._internal.models.selection_prefs import SelectionPreferences
+  USE_SELECTION_PREFS=True
+except Exception:
+  USE_SELECTION_PREFS=False
 
 try:
   from pip.req import InstallRequirement
@@ -74,19 +91,17 @@ except Exception:
     from pip._internal.req import InstallRequirement
     install_req_from_line = InstallRequirement.from_line
   except Exception:
-    # Pip 18.1 moved from_line to the constructors
     from pip._internal.req.constructors import install_req_from_line
 
 packages = {}
-
-if cmd is None:
-  cmd = InstallCommand()
 options, args = cmd.parse_args(sys.argv[1:])
+
 with cmd._build_session(options) as session:
   if options.no_index:
     index_urls = []
   else:
     index_urls = [options.index_url] + options.extra_index_urls
+
   finder_options = dict(
     find_links=options.find_links or [],
     index_urls=index_urls,
@@ -94,33 +109,61 @@ with cmd._build_session(options) as session:
     trusted_hosts=options.trusted_hosts,
     session=session,
   )
+
   if getattr(options, 'process_dependency_links', None):
     finder_options['process_dependency_links'] = options.process_dependency_links
+
   if getattr(options, 'format_control', None):
     finder_options['format_control'] = options.format_control
-  try:
+
+  if not callable(getattr(PackageFinder, 'create', None)):
     finder = PackageFinder(**finder_options)
-  except TypeError:
-    finder = PackageFinder.create(
-      LinkCollector(session=session,
-                    search_scope=SearchScope.create(
-                      find_links=finder_options['find_links'],
-                      index_urls=finder_options['index_urls']
-                    )
-      ),
-      SelectionPreferences(allow_yanked=False,
-                           allow_all_prereleases=finder_options['allow_all_prereleases'],
-                           format_control=finder_options.get('format_control')
+  else:
+    if USE_LINK_COLLECTOR:
+      finder = PackageFinder.create(
+        LinkCollector(
+          session=session,
+          search_scope=SearchScope.create(
+            find_links=finder_options['find_links'],
+            index_urls=finder_options['index_urls']
+          )
+        ),
+        SelectionPreferences(
+          allow_yanked=False,
+          allow_all_prereleases=finder_options['allow_all_prereleases'],
+          format_control=finder_options.get('format_control')
+        )
       )
-    )
+    else:
+      finder = PackageFinder.create(
+        search_scope=SearchScope.create(
+          find_links=finder_options['find_links'],
+          index_urls=finder_options['index_urls']
+        ),
+        selection_prefs=SelectionPreferences(
+          allow_yanked=False,
+          allow_all_prereleases=finder_options['allow_all_prereleases'],
+          format_control=finder_options.get('format_control')
+        ),
+        session=session
+      )
+
   find_all = getattr(finder, 'find_all_candidates', getattr(finder, '_find_all_versions', None))
+
   for arg in args:
     req = install_req_from_line(arg)
     found = finder.find_requirement(req, True)
     all_candidates = find_all(req.name)
-    candidate = [c for c in all_candidates if getattr(c, 'location', getattr(c, 'link', None)) == found]
+    candidate = [
+      c for c in all_candidates if getattr(c, 'location', getattr(c, 'link', None)) ==
+      getattr(found, 'location', getattr(found, 'link', found))
+    ]
+
     if candidate:
-      packages[getattr(candidate[0], 'project', getattr(candidate[0], 'name', None)).lower()] = str(candidate[0].version)
+      packages[
+      	getattr(candidate[0], 'project', getattr(candidate[0], 'name', None)).lower()
+      ] = str(candidate[0].version)
+
 json.dump(packages, sys.stdout)
 EOH
 
